@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="TSDF2Mesh" type="TSDF2Mesh_node" name="tsdf2mesh"  output="screen"  >
+    </node>
+
+</launch>
