@@ -12,20 +12,50 @@
 #include <shape_msgs/MeshTriangle.h>
 #include <rviz_visual_tools/rviz_visual_tools.h>
 #include <std_msgs/Float32MultiArray.h>
-
+#include <tf2_eigen/tf2_eigen.h>
+#include <tf2/convert.h>
+#include <tf2_ros/transform_listener.h>
+#include <chrono>
+#include <cinttypes>
 using namespace Geometry;
 using namespace Meshing;
 using namespace Math3D;
 
-#define CELL_SIZE 0.01
-#define TRUNCATION_DISTANCE -1
+#define CELL_SIZE 0.05
+#define TRUNCATION_DISTANCE -0.1
 
 rviz_visual_tools::RvizVisualToolsPtr visual_tools_;
+tf2_ros::Buffer tfBuffer;
+std::shared_ptr<tf2_ros::TransformListener> tfListener;
+
+template <typename UNIT>
+inline int64_t get_system_timestamp() {
+  const auto tp = std::chrono::system_clock::now().time_since_epoch();
+  return std::chrono::duration_cast<UNIT>(tp).count();
+}
 
 void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
 {
+    static bool init = false;
+    static Eigen::Isometry3d pose;
+    static geometry_msgs::TransformStamped transformStamped;
+    if(!init){
+        try{
+        transformStamped = tfBuffer.lookupTransform("world", "slam",
+                                ros::Time(0));
+        pose = tf2::transformToEigen(transformStamped);
+
+        }
+        catch (tf2::TransformException &ex) {
+        ROS_WARN("%s",ex.what());
+        }
+        init = true;
+    }
+
     auto values = msg->data;
     ROS_INFO("I heard tsdf of size: ", msg->data.size());
+    const auto st = get_system_timestamp<std::chrono::milliseconds>();  // nsec
+
     int numPoints = msg->data.size()/4;
     float minValue = 1e100, maxValue = -1e100;
     AABB3D bbox;
@@ -39,7 +69,7 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
     printf("   x range [%g,%g]\n",bbox.bmin.x,bbox.bmax.x);
     printf("   y range [%g,%g]\n",bbox.bmin.y,bbox.bmax.y);
     printf("   z range [%g,%g]\n",bbox.bmin.z,bbox.bmax.z);
-        float truncation_distance = TRUNCATION_DISTANCE;
+    float truncation_distance = TRUNCATION_DISTANCE;
     if(TRUNCATION_DISTANCE < 0) {
         //auto-detect truncation distance
         truncation_distance = Max(-minValue,maxValue)*0.99;
@@ -63,7 +93,10 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
 
     std::cout<<"vertsSize: "<<vertsSize<<std::endl;
     std::cout<<"trisSize: "<<trisSize<<std::endl;
-        // std::cout<<mesh.verts[0].x<<std::endl;
+    const auto end = get_system_timestamp<std::chrono::milliseconds>();
+    std::cout<<"mesh processing time: "<<end-st<<" ms"<<std::endl;
+
+    const auto st_msg = get_system_timestamp<std::chrono::milliseconds>();  
     shape_msgs::Mesh::Ptr mMeshMsg = boost::make_shared<shape_msgs::Mesh>();
 
     // geometry_msgs/Point[] 
@@ -86,15 +119,20 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
         // std::cout<<mesh.tris[i].a<<std::endl;
     }
 
-    Eigen::Isometry3d pose;
-    pose = Eigen::AngleAxisd(0, Eigen::Vector3d::UnitY()); // rotate along X axis by 45 degrees
-    pose.translation() = Eigen::Vector3d( 0, 0, 0 ); // translate x,y,z
+    // Eigen::Isometry3d pose;
+    // pose = Eigen::AngleAxisd(0, Eigen::Vector3d::UnitY()); // rotate along X axis by 45 degrees
+    // pose.translation() = Eigen::Vector3d( 0, 0, 0 ); // translate x,y,z
 
     // Publish arrow vector of pose
-    visual_tools_->publishMesh(pose, *mMeshMsg, rviz_visual_tools::RED);
+    visual_tools_->publishMesh(pose, *mMeshMsg, rviz_visual_tools::ORANGE, 1, "mesh", 1); // rviz_visual_tools::TRANSLUCENT_LIGHT
+
+    const auto end_msg = get_system_timestamp<std::chrono::milliseconds>();  
+    std::cout<<"Maker msg processing time: "<<end_msg-st_msg<<" ms"<<std::endl;
+
 
     // Don't forget to trigger the publisher!
     visual_tools_->trigger();
+
 
 }
 
@@ -110,9 +148,14 @@ using namespace std;
 int main(int argc, char** argv) {
     ros::init(argc, argv, "tsdf_node");
     ros::NodeHandle nh;
-    visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("world","/mesh_reconst"));
+    visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("world","/mesh_reconst", nh));
+    visual_tools_->setPsychedelicMode(false);
+    visual_tools_->loadMarkerPub();
 
-    ros::Subscriber sub = nh.subscribe("/tsdf", 1, tsdfCallback);
+    // visual_tools_->enableBatchPublishing(false);
+    tfListener= std::make_shared<tf2_ros::TransformListener>(tfBuffer);
+    ros::Subscriber sub = nh.subscribe("/tsdf_global", 1, tsdfCallback);
+    
     ros::spin();
     return 0;
 }
