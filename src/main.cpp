@@ -1,6 +1,7 @@
 #include <KrisLibrary/geometry/TSDFReconstruction.h>
 #include <KrisLibrary/math3d/AABB3D.h>
 #include <KrisLibrary/meshing/IO.h>
+#include <KrisLibrary/meshing/TriMeshOperators.h>
 #include <KrisLibrary/utils/ioutils.h>
 #include <KrisLibrary/utils.h>
 #include <stdio.h>
@@ -87,6 +88,10 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
     printf("Extracting mesh\n");
     TriMesh mesh;
     tsdf.ExtractMesh(mesh);
+    std::cout<<"Before Merge: vertsSize: "<<mesh.verts.size()<<std::endl;
+    std::cout<<"Before Merge: trisSize: "<<mesh.tris.size()<<std::endl;
+
+    MergeVertices(mesh, 0.05);
 
     int vertsSize = mesh.verts.size();
     int trisSize = mesh.tris.size();
