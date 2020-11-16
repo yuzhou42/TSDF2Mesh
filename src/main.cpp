@@ -28,7 +28,7 @@ using namespace Math3D;
 rviz_visual_tools::RvizVisualToolsPtr visual_tools_;
 tf2_ros::Buffer tfBuffer;
 std::shared_ptr<tf2_ros::TransformListener> tfListener;
-
+bool glbalMesh;
 template <typename UNIT>
 inline int64_t get_system_timestamp() {
   const auto tp = std::chrono::system_clock::now().time_since_epoch();
@@ -127,7 +127,6 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
     // Eigen::Isometry3d pose;
     // pose = Eigen::AngleAxisd(0, Eigen::Vector3d::UnitY()); // rotate along X axis by 45 degrees
     // pose.translation() = Eigen::Vector3d( 0, 0, 0 ); // translate x,y,z
-
     // Publish arrow vector of pose
     visual_tools_->publishMesh(pose, *mMeshMsg, rviz_visual_tools::ORANGE, 1, "mesh", 1); // rviz_visual_tools::TRANSLUCENT_LIGHT
 
@@ -153,14 +152,24 @@ using namespace std;
 int main(int argc, char** argv) {
     ros::init(argc, argv, "tsdf_node");
     ros::NodeHandle nh;
+    nh.param("/tsdf2mesh/global_mesh", glbalMesh, true);
+
     visual_tools_.reset(new rviz_visual_tools::RvizVisualTools("world","/mesh_reconst", nh));
     visual_tools_->setPsychedelicMode(false);
     visual_tools_->loadMarkerPub();
 
     // visual_tools_->enableBatchPublishing(false);
     tfListener= std::make_shared<tf2_ros::TransformListener>(tfBuffer);
-    ros::Subscriber sub = nh.subscribe("/tsdf_global", 1, tsdfCallback);
-    
+    ros::Subscriber subTsdf;
+    if(glbalMesh){
+        subTsdf = nh.subscribe("/tsdf_global", 1, tsdfCallback);
+        std::cout<<"realtime global tsdf"<<std::endl;
+    }
+    else{
+        subTsdf = nh.subscribe("/tsdf_local", 1, tsdfCallback);
+        std::cout<<"realtime local tsdf"<<std::endl;
+    }
+
     ros::spin();
     return 0;
 }

@@ -1,5 +1,6 @@
 <launch>
     <node pkg="TSDF2Mesh" type="TSDF2Mesh_node" name="tsdf2mesh"  output="screen"  >
+        <param name="global_mesh"   type="bool"       value="false" />
     </node>
     <!-- <node type="rviz" name="rviz" pkg="rviz" /> -->
 </launch>
