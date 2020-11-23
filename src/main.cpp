@@ -27,6 +27,7 @@ using namespace Math3D;
 
 rviz_visual_tools::RvizVisualToolsPtr visual_tools_;
 tf2_ros::Buffer tfBuffer;
+ros::Publisher meshPub;
 std::shared_ptr<tf2_ros::TransformListener> tfListener;
 bool glbalMesh;
 template <typename UNIT>
@@ -103,12 +104,12 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
 
     const auto st_msg = get_system_timestamp<std::chrono::milliseconds>();  
     shape_msgs::Mesh::Ptr mMeshMsg = boost::make_shared<shape_msgs::Mesh>();
-
     // geometry_msgs/Point[] 
     mMeshMsg->vertices.resize(vertsSize);
 
     // // // shape_msgs/MeshTriangle[] 
     mMeshMsg->triangles.resize(trisSize);
+    
 
     for(int i = 0; i < vertsSize; i++){
         mMeshMsg->vertices[i].x = mesh.verts[i].x;
@@ -123,7 +124,7 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
         mMeshMsg->triangles[i].vertex_indices[2] = mesh.tris[i].c;
         // std::cout<<mesh.tris[i].a<<std::endl;
     }
-
+    meshPub.publish(mMeshMsg);
     // Eigen::Isometry3d pose;
     // pose = Eigen::AngleAxisd(0, Eigen::Vector3d::UnitY()); // rotate along X axis by 45 degrees
     // pose.translation() = Eigen::Vector3d( 0, 0, 0 ); // translate x,y,z
@@ -160,7 +161,9 @@ int main(int argc, char** argv) {
 
     // visual_tools_->enableBatchPublishing(false);
     tfListener= std::make_shared<tf2_ros::TransformListener>(tfBuffer);
+    meshPub = nh.advertise<shape_msgs::Mesh>("/mesh", 1);
     ros::Subscriber subTsdf;
+    
     if(glbalMesh){
         subTsdf = nh.subscribe("/tsdf_global", 1, tsdfCallback);
         std::cout<<"realtime global tsdf"<<std::endl;
