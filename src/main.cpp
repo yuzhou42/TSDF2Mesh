@@ -18,9 +18,9 @@
 #include <tf2_ros/transform_listener.h>
 #include <chrono>
 #include <cinttypes>
-using namespace Geometry;
-using namespace Meshing;
-using namespace Math3D;
+// using namespace Geometry;
+// using namespace Meshing;
+// using namespace Math3D;
 
 #define CELL_SIZE 0.05
 #define TRUNCATION_DISTANCE -0.1
@@ -60,12 +60,12 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
 
     int numPoints = msg->data.size()/4;
     float minValue = 1e100, maxValue = -1e100;
-    AABB3D bbox;
+    Math3D::AABB3D bbox;
     int k=0;
     for(int i=0;i<numPoints;i++,k+=4) {
         minValue = Min(minValue,values[k+3]);
         maxValue = Max(maxValue,values[k+3]);
-        bbox.expand(Vector3(values[k],values[k+1],values[k+2]));
+        bbox.expand(Math3D::Vector3(values[k],values[k+1],values[k+2]));
     }
     printf("Read %d points with distance in range [%g,%g]\n",numPoints,minValue,maxValue);
     printf("   x range [%g,%g]\n",bbox.bmin.x,bbox.bmax.x);
@@ -78,16 +78,16 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
         printf("Auto-detected truncation distance %g\n",truncation_distance);
     }
     printf("Using cell size %g\n",CELL_SIZE);
-    SparseTSDFReconstruction tsdf(Vector3(CELL_SIZE),truncation_distance);
+    Geometry::SparseTSDFReconstruction tsdf(Math3D::Vector3(CELL_SIZE),truncation_distance);
     tsdf.tsdf.defaultValue[0] = truncation_distance;
     k=0;
-    Vector3 ofs(CELL_SIZE*0.5);
+    Math3D::Vector3 ofs(CELL_SIZE*0.5);
     for(int i=0;i<numPoints;i++,k+=4) {
-        tsdf.tsdf.SetValue(Vector3(values[k],values[k+1],values[k+2])+ofs,values[k+3]);
+        tsdf.tsdf.SetValue(Math3D::Vector3(values[k],values[k+1],values[k+2])+ofs,values[k+3]);
     }
 
     printf("Extracting mesh\n");
-    TriMesh mesh;
+    Meshing::TriMesh mesh;
     tsdf.ExtractMesh(mesh);
     std::cout<<"Before Merge: vertsSize: "<<mesh.verts.size()<<std::endl;
     std::cout<<"Before Merge: trisSize: "<<mesh.tris.size()<<std::endl;
@@ -140,14 +140,6 @@ void tsdfCallback(const std_msgs::Float32MultiArray::Ptr& msg)
 
 
 }
-
-using namespace Geometry;
-using namespace Meshing;
-using namespace Math3D;
-using namespace std;
-
-#define CELL_SIZE 0.01
-#define TRUNCATION_DISTANCE -1
 
 
 int main(int argc, char** argv) {
